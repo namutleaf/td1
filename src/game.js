@@ -369,7 +369,7 @@
     G.effects.push({ type: 'ring', x: h.x, y: h.y, r0: 5, r1: 40, t: 0, life: 0.5, color: '#ff5252' });
   }
 
-  function heroMoveTo(x, y) {
+  function heroMoveTo(x, y, quiet) {
     const h = G.hero;
     if (h.dead) return;
     const from = { c: Math.floor(h.x / T), r: Math.floor(h.y / T) };
@@ -378,7 +378,7 @@
     if (!tiles) return;
     h.path = tiles.slice(0, -1).map(t => tileCenter(t.c, t.r));
     h.path.push({ x, y });
-    G.effects.push({ type: 'ring', x, y, r0: 12, r1: 4, t: 0, life: 0.3, color: '#ffe082' });
+    if (!quiet) G.effects.push({ type: 'ring', x, y, r0: 12, r1: 4, t: 0, life: 0.3, color: '#ffe082' });
   }
 
   function nearestEnemy(x, y, range, exclude) {
@@ -735,6 +735,10 @@
         ctx.fillStyle = diff > 0 ? '#ffd54f' : '#90caf9';
         ctx.fillText(`경로 ${diff > 0 ? '+' : ''}${diff}칸`, x + T / 2, y - 8);
       }
+      if (G.pending && G.pending.c === hv.c && G.pending.r === hv.r) {
+        ctx.font = 'bold 12px system-ui'; ctx.textAlign = 'center';
+        ctx.fillStyle = '#fff'; ctx.fillText('한 번 더 탭하면 설치', x + T / 2, y + T + 12);
+      }
     } else {
       ctx.fillStyle = 'rgba(239,83,80,.35)'; ctx.fillRect(x, y, T, T);
       ctx.strokeStyle = '#ef5350'; ctx.lineWidth = 2; ctx.strokeRect(x + 1, y + 1, T - 2, T - 2);
@@ -771,6 +775,7 @@
       b.onclick = () => selectTool(type);
       list.appendChild(b);
     }
+    buildTouchbar();
     buildRelicList();
     refreshSelPanel();
   }
@@ -784,15 +789,38 @@
     }).join('');
   }
 
+  // 터치 기기용 조작 바: 이동 모드, 건설 도구, 선택한 건물 강화/판매, 스킬.
+  function buildTouchbar() {
+    const bar = $('touchbar');
+    const tools = [['', '이동', '#ffca28', '']].concat(
+      Object.entries(TOWERS).map(([type, d]) => [type, d.name, d.color, `${d.cost}G`]));
+    bar.innerHTML = `<div class="tb-tools">${tools.map(([type, name, color, cost]) =>
+      `<button class="tb-btn" data-type="${type}"><span class="swatch" style="background:${color}"></span>${name}<small>${cost}</small></button>`).join('')}</div>
+      <div class="tb-sel" hidden><button id="tb-up"></button><button id="tb-sell" class="danger"></button></div>
+      <button id="tb-skill" class="tb-skill">스킬</button>`;
+    for (const b of bar.querySelectorAll('.tb-btn')) {
+      b.onclick = () => {
+        if (b.dataset.type) selectTool(b.dataset.type);
+        else { G.tool = null; G.selected = null; G.pending = null; refreshSelPanel(); }
+      };
+    }
+    $('tb-up').onclick = () => { if (G.selected) { upgradeTower(G.selected); refreshSelPanel(); } };
+    $('tb-sell').onclick = () => { if (G.selected) sellTower(G.selected); };
+    $('tb-skill').onclick = useSkill;
+  }
+
   function selectTool(type) {
     G.tool = G.tool === type ? null : type;
     G.selected = null;
+    G.pending = null;
     refreshSelPanel();
   }
 
   function refreshSelPanel() {
     const panel = $('sel-panel');
     const t = G.selected;
+    const tbSel = document.querySelector('.tb-sel');
+    tbSel.hidden = !t;
     if (!t) { panel.hidden = true; return; }
     panel.hidden = false;
     const def = TOWERS[t.type];
@@ -811,6 +839,10 @@
     const up = $('btn-up');
     if (up) up.onclick = () => { upgradeTower(t); refreshSelPanel(); };
     $('btn-sell').onclick = () => sellTower(t);
+    const canUp = t.type !== 'wall' && t.lv < TOWER_MAX_LV;
+    $('tb-up').hidden = !canUp;
+    if (canUp) $('tb-up').textContent = `강화 ${upgradeCost(t)}G`;
+    $('tb-sell').textContent = `판매 +${refund}G`;
   }
 
   let hudTimer = 0;
@@ -840,6 +872,15 @@
       </div>`;
     const up = $('btn-up');
     if (up && G.selected) up.disabled = G.gold < upgradeCost(G.selected);
+    for (const b of document.querySelectorAll('.tb-btn')) {
+      const type = b.dataset.type;
+      b.classList.toggle('active', (type || null) === G.tool);
+      b.classList.toggle('poor', !!type && G.gold < TOWERS[type].cost);
+    }
+    if (G.selected) $('tb-up').disabled = G.gold < upgradeCost(G.selected);
+    const sk = $('tb-skill');
+    sk.disabled = h.dead || h.skillCd > 0;
+    sk.textContent = h.skillCd > 0 ? `스킬 ${Math.ceil(h.skillCd)}` : '스킬';
   }
 
   // ───────────────────────── 모달 ─────────────────────────
@@ -898,13 +939,17 @@
     return { x: (ev.clientX - rect.left) * (W / rect.width), y: (ev.clientY - rect.top) * (H / rect.height) };
   }
 
-  canvas.addEventListener('mousemove', ev => {
+  // 마우스: 호버 미리보기 → 클릭 설치. 터치: 첫 탭 미리보기 → 같은 칸 다시 탭 설치.
+  // 건설 도구가 없을 때(이동 모드) 빈 칸을 누르면 영웅 이동, 누른 채 끌면 손가락을 따라감.
+  let dragMove = false;
+  canvas.addEventListener('pointermove', ev => {
     const p = canvasPos(ev);
-    G.hover = { c: Math.floor(p.x / T), r: Math.floor(p.y / T) };
+    if (ev.pointerType === 'mouse') G.hover = { c: Math.floor(p.x / T), r: Math.floor(p.y / T) };
+    if (dragMove) heroMoveTo(p.x, p.y, true);
   });
-  canvas.addEventListener('mouseleave', () => { G.hover = null; });
+  canvas.addEventListener('pointerleave', ev => { if (ev.pointerType === 'mouse') G.hover = null; });
   canvas.addEventListener('contextmenu', ev => ev.preventDefault());
-  canvas.addEventListener('mousedown', ev => {
+  canvas.addEventListener('pointerdown', ev => {
     if (G.modal || G.phase === 'over') return;
     const p = canvasPos(ev);
     if (ev.button === 2) { heroMoveTo(p.x, p.y); return; }
@@ -913,10 +958,27 @@
     const { board } = G;
     if (!board.inside(c, r)) return;
     const t = board.towers[board.idx(c, r)];
-    if (t) { G.selected = t; refreshSelPanel(); return; }
-    if (G.tool) placeTower(c, r);
-    else { G.selected = null; refreshSelPanel(); }
+    if (t) { G.selected = t; G.pending = null; refreshSelPanel(); return; }
+    if (G.tool) {
+      const confirmed = G.pending && G.pending.c === c && G.pending.r === r;
+      if (ev.pointerType !== 'mouse' && !confirmed) {
+        G.pending = { c, r };
+        G.hover = { c, r };
+        return;
+      }
+      G.pending = null;
+      placeTower(c, r);
+      return;
+    }
+    G.selected = null;
+    refreshSelPanel();
+    heroMoveTo(p.x, p.y);
+    dragMove = true;
+    canvas.setPointerCapture(ev.pointerId);
   });
+  const endDrag = () => { dragMove = false; };
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointercancel', endDrag);
 
   window.addEventListener('keydown', ev => {
     if (ev.target.tagName === 'INPUT') return;
@@ -929,7 +991,7 @@
       case 'Enter': case 'KeyN': startWave(); break;
       case 'KeyP': G.paused = !G.paused; break;
       case 'KeyF': cycleSpeed(); break;
-      case 'Escape': G.tool = null; G.selected = null; refreshSelPanel(); break;
+      case 'Escape': G.tool = null; G.selected = null; G.pending = null; refreshSelPanel(); break;
       case 'KeyU': if (G.selected) { upgradeTower(G.selected); refreshSelPanel(); } break;
       case 'KeyX': case 'Delete': if (G.selected) sellTower(G.selected); break;
     }
@@ -963,7 +1025,9 @@
   showModal('미로 영웅 TD (가제)',
     `타워로 <b>미로</b>를 짜서 적의 길을 늘리고, <b>영웅</b>을 직접 움직여 싸우세요.<br>
      적이 떨어뜨린 <b>아이템</b>을 주워 강해지고, 웨이브마다 <b>유물</b>을 골라 런을 완성하세요.<br><br>
-     <span class="muted">WASD/방향키 이동 · 우클릭 지점 이동 · Space 스킬 · 1~4 건설 · Enter 웨이브 시작</span>` +
+     <span class="muted">${matchMedia('(pointer: coarse)').matches
+       ? '건물 고르고 칸을 탭 → 경로 미리보기 → 한 번 더 탭하면 설치<br>[이동] 모드에서 탭하거나 끌면 영웅이 따라감 · 건물을 탭하면 강화/판매'
+       : 'WASD/방향키 이동 · 우클릭 지점 이동 · Space 스킬 · 1~4 건설 · Enter 웨이브 시작'}</span>` +
      (best.wave ? `<br><span class="muted">최고 기록: ${best.wave} 웨이브</span>` : ''),
     [{ cls: 'primary', html: '런 시작', onClick: () => {} }]);
   requestAnimationFrame(frame);

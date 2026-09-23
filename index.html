@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>미로 영웅 TD (가제)</title>
+  <title>미로 영웅 TD</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -21,7 +21,13 @@
     </header>
 
     <main>
-      <div id="board-wrap"><canvas id="board"></canvas></div>
+      <div id="board-wrap">
+        <div class="play">
+          <canvas id="board"></canvas>
+          <div id="touchbar"></div>
+        </div>
+        <p id="rotate-hint">폰을 가로로 돌리면 맵이 더 크게 보입니다</p>
+      </div>
       <aside id="side">
         <section>
           <h3>건설 <span class="muted">— 모든 건물은 길을 막습니다</span></h3>

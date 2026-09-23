@@ -13,6 +13,9 @@
 
 * { box-sizing: border-box; }
 
+html { color-scheme: dark; }
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
   background: var(--bg);
@@ -36,6 +39,7 @@ body {
 .spacer { flex: 1; }
 
 button {
+  touch-action: manipulation;
   font: inherit; color: var(--text);
   background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px;
   padding: 7px 12px; cursor: pointer;
@@ -54,8 +58,28 @@ kbd {
 main { display: flex; gap: 12px; align-items: flex-start; }
 #board-wrap { flex: 1; min-width: 0; }
 #board {
-  display: block; width: 100%; height: auto;
+  display: block; width: 100%; max-width: 100%; height: auto; flex: none;
   border-radius: 10px; border: 1px solid var(--line); cursor: crosshair;
+  touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+}
+.play { display: flex; flex-direction: column; gap: 8px; align-items: center; }
+
+/* 터치 조작 바: 마우스 환경에서는 숨김 */
+#touchbar { display: none; }
+#rotate-hint { display: none; }
+.tb-tools, .tb-sel { display: flex; flex-wrap: wrap; gap: 6px; }
+.tb-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  min-width: 56px; padding: 6px 8px; font-size: 13px; font-weight: 600;
+}
+.tb-btn .swatch { width: 14px; height: 14px; border-radius: 3px; }
+.tb-btn small { font-size: 11px; color: var(--gold); font-weight: 700; min-height: 1em; }
+.tb-btn.active { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; background: #2e2a1c; }
+.tb-btn.poor small { color: var(--danger); }
+.tb-sel button { font-size: 13px; padding: 8px 10px; }
+.tb-skill {
+  background: #3a2f10; border-color: #ffca28; color: #ffe082; font-weight: 700;
+  padding: 10px 14px; border-radius: 12px;
 }
 
 #side { width: 290px; flex-shrink: 0; display: flex; flex-direction: column; gap: 10px; }
@@ -115,10 +139,39 @@ main { display: flex; gap: 12px; align-items: flex-start; }
 #modal-choices .card span:last-child { font-size: 12px; color: var(--muted); }
 #modal-choices .skip { flex-basis: 100%; max-width: 240px; }
 #modal-choices .primary { padding: 10px 28px; font-size: 16px; }
+.modal-box { max-height: calc(100dvh - 32px); overflow-y: auto; }
 
 @media (max-width: 900px) {
   #app { padding: 10px 16px; }
   main { flex-direction: column; }
   #side { width: 100%; }
   .stat { min-width: 54px; padding: 0 6px; }
+}
+
+/* ── 터치 기기 (폰/태블릿) ── */
+@media (pointer: coarse) {
+  #app { padding: 8px 16px; }
+  main { flex-direction: column; }
+  #side { width: 100%; }
+  #topbar { padding: 6px 8px; gap: 6px; margin-bottom: 8px; }
+  .stat { min-width: 0; padding: 0 6px; }
+  .stat .label { font-size: 10px; }
+  .stat span:last-child { font-size: 15px; }
+  #topbar button { padding: 6px 10px; font-size: 13px; }
+  #touchbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; width: 100%; }
+  /* 화면 높이에 맞춰 맵 크기 결정 (가로 모드에서 스크롤 없이 한 화면) */
+  #board { width: min(100%, calc((100dvh - 72px) * 22 / 13)); }
+  #modal-choices .card { width: 150px; padding: 10px 8px; }
+}
+@media (pointer: coarse) and (orientation: landscape) {
+  .play { flex-direction: row; align-items: flex-start; justify-content: center; }
+  #board { width: min(calc(100% - 150px), calc((100dvh - 72px) * 22 / 13)); }
+  #touchbar { flex-direction: column; flex-wrap: nowrap; width: 142px; }
+  .tb-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; width: 100%; }
+  .tb-btn { min-width: 0; padding: 4px; font-size: 12px; }
+  .tb-sel { flex-direction: column; width: 100%; }
+  .tb-skill { width: 100%; }
+}
+@media (pointer: coarse) and (orientation: portrait) {
+  #rotate-hint { display: block; margin: 6px 0 0; text-align: center; font-size: 12px; color: var(--muted); }
 }
