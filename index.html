@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>미로 영웅 TD (가제)</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <header id="topbar">
+      <div class="stat"><span class="label">웨이브</span><span id="s-wave">0/20</span></div>
+      <div class="stat gold"><span class="label">골드</span><span id="s-gold">0</span></div>
+      <div class="stat lives"><span class="label">기지 HP</span><span id="s-lives">0</span></div>
+      <div class="stat path"><span class="label">적 경로</span><span id="s-path">-</span></div>
+      <div class="stat"><span class="label">처치</span><span id="s-kills">0</span></div>
+      <div class="spacer"></div>
+      <button id="btn-speed">속도 x1</button>
+      <button id="btn-pause">일시정지</button>
+      <button id="btn-wave" class="primary">웨이브 시작 ▶</button>
+    </header>
+
+    <main>
+      <div id="board-wrap"><canvas id="board"></canvas></div>
+      <aside id="side">
+        <section>
+          <h3>건설 <span class="muted">— 모든 건물은 길을 막습니다</span></h3>
+          <div id="build-list"></div>
+        </section>
+        <section id="sel-panel" hidden></section>
+        <section>
+          <h3>영웅</h3>
+          <div id="hero-stats"></div>
+        </section>
+        <section>
+          <h3>유물</h3>
+          <div id="relic-list"></div>
+        </section>
+        <section class="help">
+          <h3>조작</h3>
+          <ul>
+            <li><kbd>WASD</kbd>/<kbd>방향키</kbd> 영웅 이동 · <kbd>우클릭</kbd> 지점으로 이동</li>
+            <li><kbd>Space</kbd> 회오리 스킬 (주변 광역 피해)</li>
+            <li><kbd>1</kbd>~<kbd>4</kbd> 건설 선택 · <kbd>좌클릭</kbd> 설치 / 건물 선택</li>
+            <li><kbd>U</kbd> 강화 · <kbd>X</kbd> 판매 · <kbd>Esc</kbd> 취소</li>
+            <li><kbd>Enter</kbd> 웨이브 시작 · <kbd>F</kbd> 배속 · <kbd>P</kbd> 일시정지</li>
+          </ul>
+          <p class="legend">
+            <span class="dot" style="background:#ffd54f"></span>골드
+            <span class="dot" style="background:#ef5350"></span>회복약
+            <span class="dot" style="background:#b36bff"></span>유물
+          </p>
+        </section>
+      </aside>
+    </main>
+  </div>
+
+  <div id="modal" hidden>
+    <div class="modal-box">
+      <h2 id="modal-title"></h2>
+      <p id="modal-desc"></p>
+      <div id="modal-choices"></div>
+    </div>
+  </div>
+
+  <script src="src/config.js"></script>
+  <script src="src/board.js"></script>
+  <script src="src/game.js"></script>
+</body>
+</html>
